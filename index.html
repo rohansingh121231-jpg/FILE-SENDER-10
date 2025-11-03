@@ -350,7 +350,15 @@
 
             function initializePeer() {
                 try {
-                    peer = new Peer(); 
+                    // --- FIX: Connection Reliability ---
+                    // Hum PeerJS ko hamesha 'relay' mode istemaal karne ke liye force kar rahe hain.
+                    // Isse connection reliably banega, bhale hi device same Wi-Fi par ho ya alag network par.
+                    peer = new Peer(undefined, {
+                        config: {
+                            iceTransportPolicy: 'relay'
+                        }
+                    });
+                    
                 } catch (e) {
                     console.error('Failed to initialize PeerJS:', e);
                     statusEl.textContent = 'Error: Could not start peer service. Please refresh.';
