@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Send - Pro</title>
+    <!-- 1. UPDATED CDN LINKS -->
+    <!-- PeerJS (Sahi URL ke saath) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 450px;
+            width: 100%;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            text-align: center;
+        }
+
+        header {
+            background: #007bff;
+            color: white;
+            padding: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        #status {
+            font-size: 0.9em;
+            opacity: 0.9;
+            padding-top: 5px;
+        }
+
+        main {
+            padding: 25px;
+        }
+
+        #qr-code-container p {
+            font-weight: 500;
+            color: #333;
+        }
+
+        #share-buttons-container {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .share-button {
+            background-color: #f0f2f5;
+            border: 1px solid #ddd;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .share-button:hover {
+            background-color: #e0e0e0;
+        }
+        .primary-share {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+            width: 100%; 
+        }
+        .primary-share:hover {
+            background-color: #0056b3;
+        }
+
+        #qrcode {
+            width: 256px;
+            height: 256px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        #scan-instructions {
+            font-size: 1.1em;
+            font-weight: 500;
+            color: #28a745;
+        }
+
+        .transfer-area {
+            padding: 25px;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        #file-input {
+            margin-bottom: 15px;
+            display: block;
+            width: 100%;
+            color: #333;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        #file-input::file-selector-button {
+            margin-right: 10px;
+            border: none;
+            background: #007bff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+        }
+        #file-input::file-selector-button:hover {
+            background: #0056b3;
+        }
+
+
+        #transfer-status {
+            font-size: 0.9em;
+            color: #555;
+            word-wrap: break-word;
+        }
+
+        .progress-container {
+            margin-top: 15px;
+            display: none; /* Default hidden */
+        }
+
+        .progress-label {
+            font-size: 0.9em;
+            color: #333;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+
+        .progress-bar-background {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #007bff; /* Blue/Neela sender ke liye */
+            border-radius: 4px;
+            transition: width 0.1s linear;
+        }
+        
+        #receive-progress-bar {
+             background-color: #28a745; /* Green/Hara receiver ke liye */
+        }
+
+        .progress-stats {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #cancel-button {
+            margin-top: 10px;
+            background-color: #dc3545; /* Red */
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        #cancel-button:hover {
+            background-color: #c82333;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>QR Send</h1>
+            <div id="status">Initializing...</div>
+        </header>
+        
+        <main>
+            <div id="qr-code-container">
+                <div id="qrcode"></div>
+                <p>Scan this QR code with your other device's camera to connect.</p>
+                
+                <div id="share-buttons-container">
+                    <button id="native-share-button" class="share-button primary-share" style="display: none;">Share Connection</button>
+                    <button id="copy-link-button" class="share-button fallback-button">Copy Link</button>
+                    <button id="download-qr-button" class="share-button fallback-button">Download QR</button>
+                </div>
+            </div>
+
+            <div id="scan-instructions" style="display:none;">
+                <p>You are connected! You can now send files from this device.</p>
+            </div>
+        </main>
+
+        <div class="transfer-area">
+            <h3>Send a File</h3>
+            <input type="file" id="file-input" disabled multiple>
+            <div id="transfer-status">Connect to a device to send files.</div>
+
+            <!-- Sender (Blue) Progress Bar -->
+            <div id="progress-container" class="progress-container">
+                <div id="progress-label" class="progress-label">Sending...</div>
+                <div class="progress-bar-background">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+                <div class="progress-stats">
+                    <span id="progress-percentage">0%</span>
+                    <span id="progress-size">0 MB / 0 MB</span>
+                    <span id="progress-eta">ETA: --:--</span>
+                </div>
+                <button id="cancel-button">Cancel</button>
+            </div>
+            
+            <!-- Receiver (Green) Progress Bar -->
+            <div id="receive-progress-container" class="progress-container">
+                <div id="receive-progress-label" class="progress-label">Receiving...</div>
+                <div class="progress-bar-background">
+                    <div id="receive-progress-bar" class="progress-bar"></div>
+                </div>
+                <div class="progress-stats">
+                    <span id="receive-progress-percentage">0%</span>
+                    <span id="receive-progress-size">0 MB / 0 MB</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const statusEl = document.getElementById('status');
+            const qrCodeContainer = document.getElementById('qr-code-container');
+            const qrEl = document.getElementById('qrcode');
+            
+            const shareButtonsContainer = document.getElementById('share-buttons-container');
+            const nativeShareButton = document.getElementById('native-share-button');
+            const copyLinkButton = document.getElementById('copy-link-button');
+            const downloadQrButton = document.getElementById('download-qr-button');
+            
+            const scanInstructions = document.getElementById('scan-instructions');
+            const fileInput = document.getElementById('file-input');
+            const transferStatusEl = document.getElementById('transfer-status');
+
+            const progressContainer = document.getElementById('progress-container');
+            const progressLabel = document.getElementById('progress-label');
+            const progressBar = document.getElementById('progress-bar');
+            const progressPercentage = document.getElementById('progress-percentage');
+            const progressSize = document.getElementById('progress-size');
+            const progressEta = document.getElementById('progress-eta');
+            const cancelButton = document.getElementById('cancel-button');
+            
+            const receiveProgressContainer = document.getElementById('receive-progress-container');
+            const receiveProgressLabel = document.getElementById('receive-progress-label');
+            const receiveProgressBar = document.getElementById('receive-progress-bar');
+            const receiveProgressPercentage = document.getElementById('receive-progress-percentage');
+            const receiveProgressSize = document.getElementById('receive-progress-size');
+
+            const CHUNK_SIZE = 64 * 1024; // 64KB
+
+            let peer = null;
+            let currentConnection = null;
+            let myId = '';
+            let connectUrl = '';
+            
+            let fileQueue = [];
+            let isSending = false;
+            let cancelTransfer = false;
+            
+            // --- FEATURE: Heartbeat & Busy Mode ---
+            let isHost = false; // Kya yeh device QR code generate kar raha hai?
+            let heartbeatInterval = null; // Host ke liye 'ping' interval
+            let lastHeartbeatTimer = null; // Client ke liye 'timeout' timer
+            const HEARTBEAT_INTERVAL = 3000; // 3 second mein 'ping'
+            const HEARTBEAT_TIMEOUT = 10000; // 10 second tak 'ping' nahi mila to disconnect
+            let isHostBusy = false; // Kya host file dhoondh raha hai?
+            let isClientPaused = false; // Kya client ne timer ko roka hua hai?
+            
+            // --- FEATURE: Focus/Blur Detection ---
+            // Jab user file picker kholta hai ya tab badalta hai
+            window.addEventListener('focus', () => {
+                if (isHost && currentConnection) {
+                    currentConnection.send({ type: 'host-focus' });
+                }
+                isHostBusy = false;
+            });
+            window.addEventListener('blur', () => {
+                if (isHost && currentConnection) {
+                    currentConnection.send({ type: 'host-blur' });
+                }
+                isHostBusy = true;
+            });
+            // file input par click bhi 'blur' maana jaata hai
+            fileInput.addEventListener('click', () => {
+                 if (isHost && currentConnection) {
+                    currentConnection.send({ type: 'host-blur' });
+                }
+                isHostBusy = true;
+            });
+
+            // --- FEATURE: Refresh Warning ---
+            window.addEventListener('beforeunload', (event) => {
+                // Agar file send ho rahi hai, tabhi pucho
+                if (isSending) {
+                    // Standard tareeka browser ko warning dikhane ke liye
+                    const warningText = 'Aapka file transfer abhi chal raha hai. Kya aap sach mein page chhodna chahte hain? Data lost ho jaayega.';
+                    event.preventDefault();
+                    // Chrome-based browsers require returnValue to be set
+                    event.returnValue = warningText;
+                    return warningText;
+                }
+                // Agar sending nahi ho rahi, to kuch mat pucho
+            });
+
+
+            function initializePeer() {
+                try {
+                    peer = new Peer(); 
+                } catch (e) {
+                    console.error('Failed to initialize PeerJS:', e);
+                    statusEl.textContent = 'Error: Could not start peer service. Please refresh.';
+                    return;
+                }
+
+                peer.on('open', (id) => {
+                    myId = id;
+                    const targetId = window.location.hash.substring(1);
+
+                    if (targetId) {
+                        // Yeh CLIENT (Receiver) hai
+                        isHost = false;
+                        statusEl.textContent = 'Connecting...';
+                        try {
+                            // --- FIX: Connection Timeout Joda Gaya ---
+                            // 10 second ka connection timeout set karo
+                            const connectionTimeout = setTimeout(() => {
+                                console.error('Connection attempt timed out.');
+                                handleDisconnect('Connection timed out. Refreshing...');
+                            }, 10000); // 10 second timeout
+
+                            const conn = peer.connect(targetId, { reliable: true });
+
+                            conn.on('open', () => {
+                                clearTimeout(connectionTimeout); // Timeout clear karo agar connection ban gaya
+                                setupConnection(conn);
+                            });
+
+                            conn.on('error', (err) => {
+                                clearTimeout(connectionTimeout); // Timeout clear karo
+                                console.error('Initial connection failed:', err);
+                                handleDisconnect('Connection failed. Please refresh.');
+                            });
+
+                        } catch (e) {
+                            console.error('Connection failed:', e);
+                            handleDisconnect('Connection failed. Please refresh.');
+                        }
+                    } else {
+                        // Yeh HOST (Sender) hai
+                        isHost = true;
+                        qrCodeContainer.style.display = 'block';
+                        scanInstructions.style.display = 'none';
+                        
+                        connectUrl = `${window.location.origin}${window.location.pathname}#${myId}`;
+                        
+                        new QRCode(qrEl, {
+                            text: connectUrl,
+                            width: 256,
+                            height: 256,
+                            colorDark : "#000000",
+                            colorLight : "#ffffff",
+                            correctLevel : QRCode.CorrectLevel.H
+                        });
+                        
+                        shareButtonsContainer.style.display = 'flex';
+                        setTimeout(setupShareButton, 100); 
+                        statusEl.textContent = 'Ready to connect.';
+                    }
+                });
+
+                peer.on('connection', (conn) => {
+                    console.log('Incoming connection from', conn.peer);
+                    if (currentConnection) {
+                        conn.close();
+                        return;
+                    }
+                    // FIX: "Connected!" yahaan nahi dikhana hai.
+                    // Hum setupConnection ke 'open' event ka intezaar karenge.
+                    // statusEl.textContent = 'Device connected!'; // <-- YEH LINE HATA DI GAYI
+                    setupConnection(conn);
+                });
+
+                peer.on('error', (err) => {
+                    console.error('PeerJS error:', err);
+                    statusEl.textContent = `Error: ${err.message}. Try refreshing.`;
+                });
+            }
+
+            function setupConnection(conn) {
+                currentConnection = conn;
+
+                conn.on('open', () => {
+                    console.log('Connection established with', conn.peer);
+                    statusEl.textContent = `Connected!`;
+                    fileInput.disabled = false;
+                    transferStatusEl.textContent = 'Select a file (or files) to send.';
+                    qrCodeContainer.style.display = 'none';
+                    shareButtonsContainer.style.display = 'none';
+                    scanInstructions.style.display = 'block';
+                    
+                    // --- FEATURE: Heartbeat ---
+                    if (isHost) {
+                        // Agar main Host hoon, to 'ping' bhejna shuru karo
+                        startHeartbeat();
+                    } else {
+                        // Agar main Client hoon, to 'ping' ka intezaar karo
+                        resetHeartbeatTimeout();
+                    }
+                    
+                    if (fileQueue.length > 0 && !isSending) {
+                        sendNextFileFromQueue();
+                    }
+                });
+
+                let incomingFileData = [];
+                let fileMetadata = {};
+                let receivedBytes = 0;
+
+                conn.on('data', (data) => {
+                
+                    // --- FEATURE: Heartbeat & Busy Mode ---
+                    if (data.type === 'heartbeat-ping') {
+                        // Host se 'ping' mila
+                        conn.send({ type: 'heartbeat-pong' }); // 'pong' wapas bhejo
+                        if (!isClientPaused) { // Agar host 'busy' nahi hai
+                            resetHeartbeatTimeout(); // Tabhi timer ko reset karo
+                        }
+                        return; 
+                    }
+                    if (data.type === 'heartbeat-pong') {
+                        // Client se 'pong' mila
+                        return; 
+                    }
+                    if (data.type === 'host-blur') {
+                        // Host 'busy' ho gaya hai (file dhoondh raha hai)
+                        console.log('Host is busy, pausing timeout timer.');
+                        isClientPaused = true;
+                        if (lastHeartbeatTimer) {
+                            clearTimeout(lastHeartbeatTimer); // Timer ko rok do
+                            lastHeartbeatTimer = null;
+                        }
+                        return;
+                    }
+                    if (data.type === 'host-focus') {
+                        // Host 'active' ho gaya hai
+                        console.log('Host is active, resuming timeout timer.');
+                        isClientPaused = false;
+                        resetHeartbeatTimeout(); // Timer fir se chalu karo
+                        return;
+                    }
+                    
+                    // Agar main Client hoon aur koi bhi file data mila,
+                    // to matlab connection zinda hai
+                    if (!isHost && !isClientPaused) {
+                        resetHeartbeatTimeout();
+                    }
+                    // --- End Heartbeat Feature ---
+
+                    if (data.type === 'metadata') {
+                        fileMetadata = data;
+                        incomingFileData = [];
+                        receivedBytes = 0;
+                        console.log('Receiving metadata:', fileMetadata);
+                        
+                        transferStatusEl.textContent = `Receiving: ${fileMetadata.name}`;
+                        receiveProgressContainer.style.display = 'block';
+                        receiveProgressLabel.textContent = `Receiving: ${fileMetadata.name}`;
+                        receiveProgressBar.style.width = '0%';
+                        receiveProgressPercentage.textContent = '0%';
+                        receiveProgressSize.textContent = `0 MB / ${formatBytes(fileMetadata.size)}`;
+                        
+                    } else if (data.type === 'end') {
+                        console.log('File transfer complete.');
+                        const fileBlob = new Blob(incomingFileData, { type: fileMetadata.type });
+                        const downloadUrl = URL.createObjectURL(fileBlob);
+                        const a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = fileMetadata.name;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        transferStatusEl.textContent = `File ${fileMetadata.name} received!`;
+                        receiveProgressContainer.style.display = 'none';
+                        
+                    } else if (data.type === 'cancel') {
+                        console.log('Sender cancelled the transfer');
+                        transferStatusEl.textContent = 'Transfer was cancelled by sender.';
+                        incomingFileData = [];
+                        receivedBytes = 0;
+                        receiveProgressContainer.style.display = 'none';
+                        
+                    } else {
+                        // File chunk
+                        incomingFileData.push(data);
+                        
+                        receivedBytes += data.byteLength;
+                        const percent = Math.round((receivedBytes / fileMetadata.size) * 100);
+                        receiveProgressBar.style.width = `${percent}%`;
+                        receiveProgressPercentage.textContent = `${percent}%`;
+                        receiveProgressSize.textContent = `${formatBytes(receivedBytes)} / ${formatBytes(fileMetadata.size)}`;
+                    }
+                });
+
+                conn.on('close', () => {
+                    handleDisconnect('Connection closed.');
+                });
+                
+                conn.on('error', (err) => {
+                     handleDisconnect(`Connection error: ${err.message}`);
+                });
+            }
+            
+            // --- FEATURE: Naya Disconnect Handler ---
+            function handleDisconnect(message) {
+                console.log(message);
+                
+                // Saare timers clear karo
+                stopHeartbeat();
+                if (lastHeartbeatTimer) {
+                    clearTimeout(lastHeartbeatTimer);
+                    lastHeartbeatTimer = null;
+                }
+                
+                // Agar pehle se hi disconnected hai to kuch mat karo
+                if (!currentConnection) {
+                    // *** FIX: Agar client connect hi nahi ho paaya ***
+                    if (!isHost) { // Agar main Client tha aur fail ho gaya
+                         statusEl.textContent = 'Device disconnected. Refreshing...';
+                         setTimeout(() => {
+                            window.location.hash = ''; // URL se #id hatao
+                            window.location.reload(); 
+                        }, 1500);
+                    }
+                    return;
+                }
+                
+                statusEl.textContent = 'Device disconnected. Refreshing...';
+                transferStatusEl.textContent = 'Connect to a device to send files.';
+                fileInput.disabled = true;
+                currentConnection = null;
+                isSending = false;
+                fileQueue = [];
+                progressContainer.style.display = 'none';
+                receiveProgressContainer.style.display = 'none';
+                
+                // UI ko naye QR code ke liye reset karo
+                setTimeout(() => {
+                    window.location.hash = ''; // URL se #id hatao
+                    window.location.reload(); 
+                }, 1500);
+            }
+            
+            // --- FEATURE: Heartbeat Functions ---
+            function startHeartbeat() {
+                stopHeartbeat();
+                heartbeatInterval = setInterval(() => {
+                    if (currentConnection && !isHostBusy) { // Host 'busy' hai to ping mat bhejo
+                        currentConnection.send({ type: 'heartbeat-ping' });
+                    }
+                }, HEARTBEAT_INTERVAL);
+            }
+
+            function stopHeartbeat() {
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                }
+            }
+
+            function resetHeartbeatTimeout() {
+                 if (isClientPaused) return; // Agar client 'paused' hai to timer chalu mat karo
+                
+                if (lastHeartbeatTimer) {
+                    clearTimeout(lastHeartbeatTimer);
+                }
+                
+                lastHeartbeatTimer = setTimeout(() => {
+                    // Agar 10 sec tak koi message nahi aaya, to connection mar gaya
+                    console.log('Heartbeat timeout! Disconnecting...');
+                    handleDisconnect('Connection timed out.');
+                }, HEARTBEAT_TIMEOUT);
+            }
+            
+            // --- End Heartbeat Functions ---
+            
+
+            fileInput.addEventListener('change', (event) => {
+                // Jab file select ho jaaye, to 'active' signal bhejo
+                if (isHost && currentConnection) {
+                    currentConnection.send({ type: 'host-focus' });
+                }
+                isHostBusy = false;
+
+                for (const file of event.target.files) {
+                    fileQueue.push(file);
+                }
+                event.target.value = null; 
+                transferStatusEl.textContent = `${fileQueue.length} file(s) in queue.`;
+                if (currentConnection && !isSending) {
+                    sendNextFileFromQueue();
+                }
+            });
+
+            function sendNextFileFromQueue() {
+                if (fileQueue.length === 0) {
+                    isSending = false;
+                    transferStatusEl.textContent = 'All files sent! Select more files.';
+                    return;
+                }
+                if (!currentConnection || isSending) {
+                    return;
+                }
+                isSending = true;
+                cancelTransfer = false;
+                const file = fileQueue.shift();
+                
+                console.log('Sending file:', file.name);
+                transferStatusEl.textContent = `Sending ${file.name}... (${fileQueue.length} more in queue)`;
+                progressContainer.style.display = 'block';
+                progressLabel.textContent = `Sending: ${file.name}`;
+                
+                const startTime = Date.now();
+
+                currentConnection.send({
+                    type: 'metadata',
+                    name: file.name,
+                    size: file.size,
+                    fileType: file.type
+                });
+
+                let offset = 0;
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    if (cancelTransfer) {
+                        console.log('Transfer cancelled by user');
+                        isSending = false;
+                        fileQueue = [];
+                        progressContainer.style.display = 'none';
+                        transferStatusEl.textContent = 'Transfer cancelled. Select new files.';
+                        if(currentConnection) {
+                             currentConnection.send({ type: 'cancel' });
+                        }
+                        return;
+                    }
+                    
+                    if(!currentConnection) {
+                        console.error('Connection lost during file read.');
+                        isSending = false;
+                        return;
+                    }
+                
+                    currentConnection.send(e.target.result);
+                    offset += e.target.result.byteLength;
+
+                    updateProgress(offset, file.size, startTime);
+
+                    if (offset < file.size) {
+                        readSlice(offset);
+                    } else {
+                        currentConnection.send({ type: 'end' });
+                        console.log('File sent successfully.');
+                        isSending = false;
+                        progressContainer.style.display = 'none';
+                        sendNextFileFromQueue();
+                    }
+                };
+                
+                reader.onerror = (e) => {
+                    console.error('File read error:', e);
+                    isSending = false;
+                    transferStatusEl.textContent = 'Error reading file. Transfer stopped.';
+                    progressContainer.style.display = 'none';
+                };
+
+                function readSlice(o) {
+                    const slice = file.slice(o, o + CHUNK_SIZE);
+                    reader.readAsArrayBuffer(slice);
+                }
+                
+                readSlice(0);
+            }
+            
+            function updateProgress(sentBytes, totalBytes, startTime) {
+                const percent = Math.round((sentBytes / totalBytes) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressPercentage.textContent = `${percent}%`;
+                progressSize.textContent = `${formatBytes(sentBytes)} / ${formatBytes(totalBytes)}`;
+                
+                const elapsedTime = (Date.now() - startTime) / 1000;
+                if (elapsedTime > 0.5) {
+                    const speed = sentBytes / elapsedTime;
+                    const remainingBytes = totalBytes - sentBytes;
+                    const remainingTime = remainingBytes / speed;
+                    progressEta.textContent = `ETA: ${formatTime(remainingTime)}`;
+                }
+            }
+
+            function formatBytes(bytes, decimals = 2) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            }
+            
+            function formatTime(seconds) {
+                if (seconds === Infinity || isNaN(seconds)) {
+                    return '--:--';
+                }
+                const min = Math.floor(seconds / 60);
+                const sec = Math.floor(seconds % 60);
+                return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+            }
+
+            cancelButton.addEventListener('click', () => {
+                cancelTransfer = true;
+            });
+
+            function setupShareButton() {
+                const canvas = qrEl.querySelector('canvas');
+                
+                if (!canvas || typeof navigator.share === 'undefined') {
+                    nativeShareButton.style.display = 'none';
+                    copyLinkButton.style.display = 'inline-block';
+                    downloadQrButton.style.display = 'inline-block';
+                    return;
+                }
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        nativeShareButton.style.display = 'none';
+                        copyLinkButton.style.display = 'inline-block';
+                        downloadQrButton.style.display = 'inline-block';
+                        return;
+                    }
+                    
+                    const file = new File([blob], 'qr-send-connect.png', { type: 'image/png' });
+                    const shareData = {
+                        title: 'QR Send Connection',
+                        text: 'Scan this QR code or click the link to connect:',
+                        url: connectUrl,
+                        files: [file]
+                    };
+
+                    if (navigator.canShare && navigator.canShare(shareData)) {
+                        nativeShareButton.style.display = 'block';
+                        copyLinkButton.style.display = 'none';
+                        downloadQrButton.style.display = 'none';
+                        
+                        nativeShareButton.onclick = async () => {
+                            try {
+                                await navigator.share(shareData);
+                                console.log('Shared successfully');
+                            } catch (err) {
+                                if (err.name !== 'AbortError') {
+                                    console.error('Share failed:', err);
+                                }
+                            }
+                        };
+                    } else {
+                        nativeShareButton.style.display = 'none';
+                        copyLinkButton.style.display = 'inline-block';
+                        downloadQrButton.style.display = 'inline-block';
+                    }
+                }, 'image/png');
+            }
+
+            function copyToClipboard(text, element) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    if(element) {
+                        const originalText = element.textContent;
+                        element.textContent = 'Copied!';
+                        setTimeout(() => {
+                            element.textContent = originalText;
+                        }, 1500);
+                    }
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                }
+                document.body.removeChild(textarea);
+            }
+            
+            function downloadQRCode() {
+                try {
+                    const canvas = qrEl.querySelector('canvas');
+                    if (canvas) {
+                        const dataUrl = canvas.toDataURL('image/png');
+                        const a = document.createElement('a');
+                        a.href = dataUrl;
+                        a.download = 'qr-send-connect.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    } else {
+                        const img = qrEl.querySelector('img');
+                        if(img) {
+                             const a = document.createElement('a');
+                             a.href = img.src;
+                             a.download = 'qr-send-connect.png';
+                             a.target = '_blank';
+                             document.body.appendChild(a);
+                             a.click();
+                             a.remove();
+                        } else {
+                             console.error('Could not find canvas or img element to download.');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to download QR code:', e);
+                }
+            }
+
+            copyLinkButton.addEventListener('click', () => {
+                if (connectUrl) {
+                    copyToClipboard(connectUrl, copyLinkButton);
+                }
+            });
+            
+            downloadQrButton.addEventListener('click', () => {
+                downloadQRCode();
+            });
+
+            initializePeer();
+        });
+    </script>
+</body>
+</html>
+
+
