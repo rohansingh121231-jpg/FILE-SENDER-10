@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -365,30 +365,47 @@
                         // Yeh CLIENT (Receiver) hai
                         isHost = false;
                         statusEl.textContent = 'Connecting...';
+                        
+                        // --- FIX: Naya Client Failure Handler ---
+                        let connectionFailed = false;
+                        const handleClientFailure = (message) => {
+                            // Yeh function sirf ek baar chalna chahiye
+                            if (connectionFailed) return;
+                            connectionFailed = true;
+                            
+                            console.error(message);
+                            statusEl.textContent = 'Connection failed. Refreshing...';
+                            setTimeout(() => {
+                                window.location.hash = ''; // URL se #id hatao
+                                window.location.reload();
+                            }, 1500);
+                        };
+                        // --- End Failure Handler ---
+
                         try {
-                            // --- FIX: Connection Timeout Joda Gaya ---
-                            // 10 second ka connection timeout set karo
                             const connectionTimeout = setTimeout(() => {
-                                console.error('Connection attempt timed out.');
-                                handleDisconnect('Connection timed out. Refreshing...');
+                                handleClientFailure('Connection attempt timed out.');
                             }, 10000); // 10 second timeout
 
                             const conn = peer.connect(targetId, { reliable: true });
 
                             conn.on('open', () => {
                                 clearTimeout(connectionTimeout); // Timeout clear karo agar connection ban gaya
-                                setupConnection(conn);
+                                // Ab 'connectionFailed' ko check karo, ho sakta hai 'open' aur 'error' dono fire ho
+                                if (!connectionFailed) {
+                                    setupConnection(conn);
+                                }
                             });
 
                             conn.on('error', (err) => {
                                 clearTimeout(connectionTimeout); // Timeout clear karo
-                                console.error('Initial connection failed:', err);
-                                handleDisconnect('Connection failed. Please refresh.');
+                                if (!currentConnection) { // Sirf tabhi handle karo jab 'open' nahi hua hai
+                                    handleClientFailure(`Initial connection failed: ${err.message}`);
+                                }
                             });
 
                         } catch (e) {
-                            console.error('Connection failed:', e);
-                            handleDisconnect('Connection failed. Please refresh.');
+                            handleClientFailure(`Connection failed: ${e.message}`);
                         }
                     } else {
                         // Yeh HOST (Sender) hai
@@ -421,7 +438,6 @@
                     }
                     // FIX: "Connected!" yahaan nahi dikhana hai.
                     // Hum setupConnection ke 'open' event ka intezaar karenge.
-                    // statusEl.textContent = 'Device connected!'; // <-- YEH LINE HATA DI GAYI
                     setupConnection(conn);
                 });
 
@@ -566,17 +582,9 @@
                     lastHeartbeatTimer = null;
                 }
                 
-                // Agar pehle se hi disconnected hai to kuch mat karo
+                // Agar connection pehle hi band ho chuka hai (ya bana hi nahi), to kuch mat karo
                 if (!currentConnection) {
-                    // *** FIX: Agar client connect hi nahi ho paaya ***
-                    if (!isHost) { // Agar main Client tha aur fail ho gaya
-                         statusEl.textContent = 'Device disconnected. Refreshing...';
-                         setTimeout(() => {
-                            window.location.hash = ''; // URL se #id hatao
-                            window.location.reload(); 
-                        }, 1500);
-                    }
-                    return;
+                    return; 
                 }
                 
                 statusEl.textContent = 'Device disconnected. Refreshing...';
@@ -877,5 +885,4 @@
     </script>
 </body>
 </html>
-
 
